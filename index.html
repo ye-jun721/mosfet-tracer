@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MOSFET I-V 커브 트레이서</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --success: #16a34a;
+      --warn-bg: #fffbeb;
+      --warn-border: #f59e0b;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; }
+    body { margin: 0; padding: 24px; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+
+    /* 상단 헤더 */
+    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: 1.35rem; font-weight: 700; }
+    .status-pill { padding: 6px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; }
+    .status-pill.on { background: #dcfce7; color: #15803d; }
+
+    /* 하드웨어 안전 체크리스트 박스 */
+    .safety-box { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; }
+    .safety-title { font-weight: 700; font-size: 0.95rem; color: #b45309; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .safety-list { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.88rem; color: #78350f; }
+    .safety-list label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+    .safety-list input[type="checkbox"] { width: 16px; height: 16px; accent-color: #d97706; }
+
+    /* 제어 패널 */
+    .toolbar { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+    button { padding: 9px 15px; border: none; border-radius: 7px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.15s; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #15803d; }
+    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .btn-sub:hover:not(:disabled) { background: #e2e8f0; }
+    .btn-danger { background: var(--danger); color: #fff; margin-left: auto; }
+    .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+
+    .input-group { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; }
+    input[type="number"] { width: 76px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; text-align: center; }
+
+    /* 오류 알림 배너 */
+    #alertBanner { display: none; background: #fef2f2; border: 1px solid #ef4444; color: #b91c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: 600; font-size: 0.9rem; }
+
+    /* 6종 그래프 그리드 */
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .card-head h3 { margin: 0; font-size: 0.95rem; color: #1e293b; }
+    .card-head span { font-size: 0.8rem; color: var(--muted); }
+    canvas { width: 100%; height: 220px; display: block; background: #fcfcfd; border: 1px solid #f1f5f9; border-radius: 6px; }
+
+    /* 하단 로그 & CSV 다운로드 */
+    .log-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .log-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .log-head h3 { margin: 0; font-size: 0.95rem; }
+    .dl-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+    #log { height: 180px; overflow-y: auto; background: #0f172a; color: #e2e8f0; font-family: Consolas, monospace; font-size: 12px; padding: 10px; border-radius: 6px; white-space: pre-wrap; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>MOSFET I-V 커브 트레이서 측정 시스템</h1>
+      <span id="statusBadge" class="status-pill">미연결 (115200 bps)</span>
+    </div>
+
+    <!-- 부품 보호 안전 체크리스트 -->
+    <div class="safety-box">
+      <div class="safety-title">하드웨어 보호 체크리스트 (측정 전 3항목 모두 확인 시 측정 활성화)</div>
+      <div class="safety-list">
+        <label><input type="checkbox" class="chk-safe" /> 1. 30kΩ/10kΩ 분압 저항의 GND 접지선 연결 확인 (12V 유입 방지)</label>
+        <label><input type="checkbox" class="chk-safe" /> 2. 외부 +12V 선이 LMC6482(8번)와 TIP41C(C)에만 연결됨 확인</label>
+        <label><input type="checkbox" class="chk-safe" /> 3. 2N7000 소자 핀(S-G-D) 방향 및 1Ω 션트 저항 연결 확인</label>
+      </div>
+    </div>
+
+    <!-- 제어 버튼 패널 -->
+    <div class="toolbar">
+      <button id="btnConn" class="btn-primary">1. 보드 연결</button>
+      <button id="btnDisc" class="btn-sub" disabled>연결 해제</button>
+
+      <div class="input-group">
+        <label for="vgsInput">목표 V<sub>GS</sub> (0~3V):</label>
+        <input id="vgsInput" type="number" step="0.1" min="0" max="3" value="2.0" />
+      </div>
+
+      <button id="btnRun" class="btn-success" disabled title="안전 체크리스트 3개를 모두 체크해야 활성화됩니다">2. 안전 측정 시작</button>
+      <button id="btnGraph" class="btn-sub" disabled>기존 데이터 그래프 불러오기 (g)</button>
+      <button id="btnStop" class="btn-danger" disabled>긴급 중단 (x)</button>
+    </div>
+
+    <div id="alertBanner"></div>
+
+    <!-- 6개 결과 그래프 -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><h3>1. MOSFET 출력 특성 (I<sub>D</sub> - V<sub>DS</sub>)</h3><span id="info1">대기 중</span></div>
+        <canvas id="c1"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>2. TIP41C 베이스-이미터 전압</h3><span>V<sub>B</sub> / V<sub>E</sub></span></div>
+        <canvas id="c2"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>3. TIP41C 전압 전달률 (%)</h3><span>정상 기준: 95~105%</span></div>
+        <canvas id="c3"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>4. DAC C - V<sub>DS</sub> 전달 특성</h3><span>실측 / 보정 V<sub>DS</sub></span></div>
+        <canvas id="c4"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>5. DAC C - V<sub>DS</sub> 선형 회귀 비교</h3><span>실측 vs 예측</span></div>
+        <canvas id="c5"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>6. 선형 회귀 잔차 (V)</h3><span>허용 오차 ±50mV</span></div>
+        <canvas id="c6"></canvas>
+      </div>
+    </div>
+
+    <!-- 시리얼 로그 및 CSV 저장 -->
+    <div class="log-card">
+      <div class="log-head">
+        <h3>통신 및 보호 동작 로그</h3>
+        <div class="dl-group">
+          <button id="dlLog" class="btn-sub btn-sm">로그(.txt) 저장</button>
+          <button id="dl1" class="btn-sub btn-sm" disabled>1_예비측정.csv</button>
+          <button id="dl2" class="btn-sub btn-sm" disabled>2_본측정_IV.csv</button>
+          <button id="dl3" class="btn-sub btn-sm" disabled>3_선형회귀.csv</button>
+        </div>
+      </div>
+      <div id="log">Chrome 또는 Edge에서 [1. 보드 연결]을 누르고 상단 안전 체크리스트 3개를 확인하세요.\n</div>
+    </div>
+  </div>
+
+<script>
+let port = null, reader = null, writer = null;
+let isConnected = false, keepReading = false, autoRequestGraph = false;
+let currentGraph = null;
+let tables = { 1: [], 2: [], 3: [] };
+let rawLog = "";
+const expectedCols = { 1: 9, 2: 9, 3: 5 };
+
+const logEl = document.getElementById("log");
+const statusBadge = document.getElementById("statusBadge");
+const alertBanner = document.getElementById("alertBanner");
+const safeChecks = document.querySelectorAll(".chk-safe");
+
+function appendLog(msg) {
+  rawLog += msg + "\n";
+  logEl.textContent += msg + "\n";
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function showAlert(msg) {
+  alertBanner.textContent = msg;
+  alertBanner.style.display = "block";
+}
+
+function clearAlert() {
+  alertBanner.style.display = "none";
+}
+
+function isSafetyChecked() {
+  return Array.from(safeChecks).every(chk => chk.checked);
+}
+
+function updateButtons() {
+  document.getElementById("btnConn").disabled = isConnected;
+  document.getElementById("btnDisc").disabled = !isConnected;
+  document.getElementById("btnGraph").disabled = !isConnected;
+  document.getElementById("btnStop").disabled = !isConnected;
+  // 연결됨 + 안전 체크리스트 3개 모두 체크 시에만 측정 버튼 활성화
+  document.getElementById("btnRun").disabled = !(isConnected && isSafetyChecked());
+
+  statusBadge.textContent = isConnected ? "ESP32-S3 연결됨 (115200 bps)" : "미연결 (115200 bps)";
+  statusBadge.className = isConnected ? "status-pill on" : "status-pill";
+}
+
+safeChecks.forEach(chk => chk.addEventListener("change", updateButtons));
+
+async function sendCommand(cmd) {
+  if (!writer) return;
+  await writer.write(new TextEncoder().encode(cmd));
+  appendLog("[명령 전송] " + cmd.trim());
+}
+
+document.getElementById("btnConn").onclick = async () => {
+  if (!("serial" in navigator)) {
+    alert("Web Serial API를 지원하는 Chrome 또는 Edge 브라우저를 사용해주세요.");
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    // 자동 리셋 및 의도치 않은 출력 방지를 위해 DTR/RTS 비활성화
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    writer = port.writable.getWriter();
+    isConnected = true;
+    keepReading = true;
+    clearAlert();
+    updateButtons();
+    appendLog("[연결 완료] 보드 통신 준비됨 (115200 bps)");
+    readLoop();
+  } catch (err) {
+    appendLog("[연결 실패] " + err.message);
+  }
+};
+
+document.getElementById("btnDisc").onclick = async () => {
+  keepReading = false;
+  try {
+    if (reader) { await reader.cancel(); reader.releaseLock(); reader = null; }
+    if (writer) { writer.releaseLock(); writer = null; }
+    if (port) { await port.close(); port = null; }
+  } catch (e) {}
+  isConnected = false;
+  updateButtons();
+  appendLog("[연결 해제] 시리얼 포트를 닫았습니다.");
+};
+
+document.getElementById("btnRun").onclick = async () => {
+  if (!isSafetyChecked()) {
+    alert("상단 하드웨어 보호 체크리스트 3가지를 모두 확인해주세요.");
+    return;
+  }
+  const vgs = parseFloat(document.getElementById("vgsInput").value);
+  // 부품 보호를 위한 전압 범위 엄격 제한 (0.0V ~ 3.0V)
+  if (isNaN(vgs) || vgs < 0.0 || vgs > 3.0) {
+    alert("소자 및 DAC 보호를 위해 VGS는 0.0V ~ 3.0V 사이만 입력 가능합니다.");
+    return;
+  }
+  clearAlert();
+  tables = { 1: [], 2: [], 3: [] };
+  currentGraph = null;
+  autoRequestGraph = true;
+  await sendCommand(`v${vgs}\n`);
+};
+
+document.getElementById("btnGraph").onclick = async () => {
+  clearAlert();
+  tables = { 1: [], 2: [], 3: [] };
+  currentGraph = null;
+  await sendCommand("g\n");
+};
+
+document.getElementById("btnStop").onclick = async () => {
+  autoRequestGraph = false;
+  await sendCommand("x\n");
+  showAlert("사용자 요청으로 긴급 중단 명령(x)을 전송하여 출력을 차단했습니다.");
+};
+
+async function readLoop() {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (port && port.readable && keepReading) {
+    reader = port.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop();
+        for (const l of lines) {
+          const line = l.trim();
+          if (line) handleLine(line);
+        }
+      }
+    } catch (err) {
+      if (keepReading) appendLog("[수신 오류] " + err.message);
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+
+function handleLine(line) {
+  appendLog(line);
+
+  // 보드 자체 보호 로직 발동 감지
+  if (line.includes("[오류로 중단]") || line.includes("초과") || line.includes("위험")) {
+    showAlert("보호 동작 감지: " + line);
+  }
+
+  if (line.includes("[측정 완료]") || line.includes("[측정 종료]")) {
+    if (autoRequestGraph) {
+      autoRequestGraph = false;
+      setTimeout(() => sendCommand("g\n"), 1000);
+    }
+    return;
+  }
+
+  if (line.includes("[그래프 1]")) { currentGraph = 1; tables[1] = []; return; }
+  if (line.includes("[그래프 2]")) { currentGraph = 2; tables[2] = []; return; }
+  if (line.includes("[그래프 3]")) { currentGraph = 3; tables[3] = []; return; }
+
+  if (line.includes("그래프 데이터 추출 완료")) {
+    currentGraph = null;
+    appendLog("[완료] 6종 그래프 렌더링 완료");
+    renderAll();
+    return;
+  }
+
+  if (currentGraph !== null) {
+    if (line.startsWith("[") || line.startsWith("=") || !line.includes(",")) return;
+    const row = line.split(",").map(s => s.trim());
+    if (row.length === expectedCols[currentGraph]) {
+      tables[currentGraph].push(row);
+    }
+  }
+}
+
+function getXY(rows, xi, yi) {
+  const pts = [];
+  for (let i = 1; i < rows.length; i++) {
+    const x = parseFloat(rows[i][xi]);
+    const y = parseFloat(rows[i][yi]);
+    if (!isNaN(x) && !isNaN(y)) pts.push({ x, y });
+  }
+  return pts;
+}
+
+function plot(canvasId, seriesList, refLines = []) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width, H = rect.height;
+  const pad = { l: 48, r: 16, t: 22, b: 26 };
+  ctx.clearRect(0, 0, W, H);
+
+  let allX = [], allY = [];
+  seriesList.forEach(s => s.pts.forEach(p => { allX.push(p.x); allY.push(p.y); }));
+  refLines.forEach(y => allY.push(y));
+  if (allX.length === 0) return;
+
+  let minX = Math.min(...allX), maxX = Math.max(...allX);
+  let minY = Math.min(...allY), maxY = Math.max(...allY);
+  if (minX === maxX) { minX -= 1; maxX += 1; }
+  if (minY === maxY) { minY -= 1; maxY += 1; }
+
+  const toX = x => pad.l + ((x - minX) / (maxX - minX)) * (W - pad.l - pad.r);
+  const toY = y => H - pad.b - ((y - minY) / (maxY - minY)) * (H - pad.t - pad.b);
+
+  // 격자 및 축
+  ctx.strokeStyle = "#e2e8f0";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, H - pad.b);
+  ctx.lineTo(W - pad.r, H - pad.b);
+  ctx.stroke();
+
+  // 기준선 (점선)
+  refLines.forEach(val => {
+    const py = toY(val);
+    ctx.save();
+    ctx.strokeStyle = "#94a3b8";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, py);
+    ctx.lineTo(W - pad.r, py);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(maxY.toFixed(2), pad.l - 6, pad.t + 8);
+  ctx.fillText(minY.toFixed(2), pad.l - 6, H - pad.b);
+  ctx.textAlign = "center";
+  ctx.fillText(minX.toFixed(2), pad.l, H - 8);
+  ctx.fillText(maxX.toFixed(2), W - pad.r, H - 8);
+
+  seriesList.forEach((s, idx) => {
+    if (!s.pts.length) return;
+    ctx.strokeStyle = s.color;
+    ctx.fillStyle = s.color;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    s.pts.forEach((p, i) => {
+      const px = toX(p.x), py = toY(p.y);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+
+    s.pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(toX(p.x), toY(p.y), 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.textAlign = "left";
+    ctx.fillText("● " + s.label, pad.l + 8 + idx * 95, pad.t - 6);
+  });
+}
+
+function renderAll() {
+  const targetVgs = parseFloat(document.getElementById("vgsInput").value) || 2.0;
+
+  if (tables[2].length > 1) {
+    const vgsVals = tables[2].slice(1).map(r => parseFloat(r[2])).filter(v => !isNaN(v));
+    const avgVgs = vgsVals.length ? (vgsVals.reduce((a, b) => a + b, 0) / vgsVals.length).toFixed(3) : targetVgs.toFixed(2);
+    document.getElementById("info1").textContent = `목표 ${targetVgs.toFixed(2)}V / 실측 평균 ${avgVgs}V`;
+    plot("c1", [{ label: "ID (mA)", color: "#2563eb", pts: getXY(tables[2], 0, 1) }]);
+    document.getElementById("dl2").disabled = false;
+  }
+
+  if (tables[1].length > 1) {
+    plot("c2", [
+      { label: "VB (베이스)", color: "#d97706", pts: getXY(tables[1], 0, 3) },
+      { label: "VE (이미터)", color: "#059669", pts: getXY(tables[1], 0, 4) }
+    ]);
+    plot("c3", [
+      { label: "원본 (%)", color: "#64748b", pts: getXY(tables[1], 0, 5) },
+      { label: "필터 (%)", color: "#7c3aed", pts: getXY(tables[1], 0, 6) }
+    ], [95, 105]);
+    plot("c4", [
+      { label: "실제 VDS", color: "#2563eb", pts: getXY(tables[1], 0, 1) },
+      { label: "보정 VDS", color: "#16a34a", pts: getXY(tables[1], 0, 2) }
+    ]);
+    document.getElementById("dl1").disabled = false;
+  }
+
+  if (tables[3].length > 1) {
+    plot("c5", [
+      { label: "실측 VDS", color: "#2563eb", pts: getXY(tables[3], 0, 1) },
+      { label: "회귀 예측", color: "#dc2626", pts: getXY(tables[3], 0, 2) }
+    ]);
+    plot("c6", [
+      { label: "잔차 (V)", color: "#ca8a04", pts: getXY(tables[3], 0, 3) }
+    ], [0.05, 0, -0.05]);
+    document.getElementById("dl3").disabled = false;
+  }
+}
+
+function downloadCSV(filename, text) {
+  const blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+document.getElementById("dlLog").onclick = () => downloadCSV("전체_시리얼_로그.txt", rawLog);
+document.getElementById("dl1").onclick = () => downloadCSV("1_예비측정.csv", tables[1].map(r => r.join(",")).join("\n"));
+document.getElementById("dl2").onclick = () => downloadCSV("2_본측정_IV.csv", tables[2].map(r => r.join(",")).join("\n"));
+document.getElementById("dl3").onclick = () => downloadCSV("3_선형회귀.csv", tables[3].map(r => r.join(",")).join("\n"));
+window.addEventListener("resize", renderAll);
+</script>
+</body>
+</html>
