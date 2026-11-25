@@ -3,474 +3,999 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MOSFET I-V 커브 트레이서</title>
+  <title>손에 잡히는 MOSFET 실전 워크북 & 커브 트레이서</title>
   <style>
     :root {
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
+      --bg: #f3f6fa;
+      --paper: #ffffff;
+      --edge: #e2e8f0;
+      --ink: #1e293b;
       --muted: #64748b;
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --danger: #dc2626;
-      --danger-hover: #b91c1c;
-      --success: #16a34a;
-      --warn-bg: #fffbeb;
-      --warn-border: #f59e0b;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --teal: #0d9488;
+      --teal-soft: #f0fdfa;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --green: #16a34a;
+      --red: #dc2626;
     }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; }
-    body { margin: 0; padding: 24px; background: var(--bg); color: var(--text); }
-    .wrap { max-width: 1200px; margin: 0 auto; }
+    * { box-sizing: border-box; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--ink); min-height: 100vh; display: flex; flex-direction: column; }
 
-    /* 상단 헤더 */
-    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-    .header h1 { margin: 0; font-size: 1.35rem; font-weight: 700; }
-    .status-pill { padding: 6px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; }
-    .status-pill.on { background: #dcfce7; color: #15803d; }
+    /* 상단 헤더 & 성취도 바 */
+    .topbar {
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 10px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.15);
+    }
+    .top-row {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 0.98rem; }
+    .btn-menu { background: #334155; color: #fff; border: none; padding: 6px 12px; border-radius: 7px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+    .btn-menu:hover { background: #475569; }
 
-    /* 하드웨어 안전 체크리스트 박스 */
-    .safety-box { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; }
-    .safety-title { font-weight: 700; font-size: 0.95rem; color: #b45309; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-    .safety-list { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.88rem; color: #78350f; }
-    .safety-list label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
-    .safety-list input[type="checkbox"] { width: 16px; height: 16px; accent-color: #d97706; }
+    .progress-wrap { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 340px; min-width: 210px; }
+    .progress-label { font-size: 0.8rem; font-weight: 700; color: #93c5fd; white-space: nowrap; }
+    .progress-track { flex: 1; height: 10px; background: #334155; border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #34d399); transition: width 0.4s ease; border-radius: 999px; }
+    .progress-pct { font-size: 0.84rem; font-weight: 800; color: #34d399; min-width: 40px; text-align: right; }
 
-    /* 제어 패널 */
-    .toolbar { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
-    button { padding: 9px 15px; border: none; border-radius: 7px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.15s; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-    .btn-success { background: var(--success); color: #fff; }
-    .btn-success:hover:not(:disabled) { background: #15803d; }
-    .btn-sub { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
-    .btn-sub:hover:not(:disabled) { background: #e2e8f0; }
-    .btn-danger { background: var(--danger); color: #fff; margin-left: auto; }
-    .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+    .hw-box { display: flex; align-items: center; gap: 8px; }
+    .hw-pill { font-size: 0.78rem; padding: 5px 10px; border-radius: 999px; background: #334155; color: #cbd5e1; font-weight: 700; }
+    .hw-pill.on { background: #166534; color: #dcfce7; }
 
-    .input-group { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; }
-    input[type="number"] { width: 76px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; text-align: center; }
+    /* 목차 드로어 */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 90; }
+    .overlay.open { display: block; }
+    .drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 320px; max-width: 85vw;
+      background: #fff; z-index: 100; padding: 20px; box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+      transform: translateX(-100%); transition: transform 0.25s ease; overflow-y: auto;
+    }
+    .drawer.open { transform: translateX(0); }
+    .toc-item {
+      width: 100%; text-align: left; background: none; border: 1px solid transparent;
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; cursor: pointer;
+      display: flex; align-items: center; gap: 9px; font-size: 0.87rem; color: var(--ink);
+    }
+    .toc-item:hover { background: #f1f5f9; }
+    .toc-item.active { background: var(--blue-soft); border-color: #93c5fd; color: var(--blue); font-weight: 700; }
+    .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #e2e8f0; font-weight: 700; flex-shrink: 0; }
+    .tag.q { background: #fef3c7; color: #92400e; }
+    .tag.l { background: #dcfce7; color: #166534; }
 
-    /* 오류 알림 배너 */
-    #alertBanner { display: none; background: #fef2f2; border: 1px solid #ef4444; color: #b91c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: 600; font-size: 0.9rem; }
+    /* 책 본문 스테이지 */
+    .stage { flex: 1; max-width: 1040px; width: 100%; margin: 20px auto; padding: 0 16px; perspective: 1800px; }
+    .sheet {
+      background: var(--paper);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      box-shadow: 0 12px 28px rgba(15,23,42,0.07), inset 12px 0 20px -16px rgba(15,23,42,0.15);
+      padding: 32px 38px;
+      min-height: 610px;
+      transform-origin: left center;
+    }
+    @media (max-width: 720px) { .sheet { padding: 20px 16px; min-height: 520px; } }
+    .flip-next { animation: flipN 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+    .flip-prev { animation: flipP 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes flipN { 0% { opacity: 0.4; transform: rotateY(-10deg) translateX(22px); } 100% { opacity: 1; transform: none; } }
+    @keyframes flipP { 0% { opacity: 0.4; transform: rotateY(10deg) translateX(-22px); } 100% { opacity: 1; transform: none; } }
 
-    /* 6종 그래프 그리드 */
-    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
-    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
-    .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .card-head h3 { margin: 0; font-size: 0.95rem; color: #1e293b; }
-    .card-head span { font-size: 0.8rem; color: var(--muted); }
-    canvas { width: 100%; height: 220px; display: block; background: #fcfcfd; border: 1px solid #f1f5f9; border-radius: 6px; }
+    .page { display: none; }
+    .page.active { display: block; }
 
-    /* 하단 로그 & CSV 다운로드 */
-    .log-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
-    .log-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    .log-head h3 { margin: 0; font-size: 0.95rem; }
-    .dl-group { display: flex; gap: 6px; flex-wrap: wrap; }
-    .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
-    #log { height: 180px; overflow-y: auto; background: #0f172a; color: #e2e8f0; font-family: Consolas, monospace; font-size: 12px; padding: 10px; border-radius: 6px; white-space: pre-wrap; line-height: 1.45; }
+    /* 캐릭터 애니메이션 */
+    @keyframes charBounce {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-7px) rotate(-3deg); }
+      55% { transform: translateY(0) rotate(2deg); }
+      75% { transform: translateY(-3px) rotate(0deg); }
+    }
+    @keyframes charNod {
+      0%, 100% { transform: translateY(0) scale(1); }
+      30% { transform: translateY(3px) scale(0.97); }
+      65% { transform: translateY(-4px) scale(1.02); }
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .anim-mos { animation: charBounce 0.95s ease-in-out 2; }
+    .anim-volt { animation: charNod 0.9s ease-in-out 2; }
+
+    /* 캐릭터 말풍선 위젯 */
+    .mascot-bar {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: linear-gradient(135deg, #eff6ff 0%, #f0fdfa 100%);
+      border: 1px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 13px 17px;
+      margin-bottom: 18px;
+      transition: 0.25s;
+    }
+    .mascot-bar.volt-theme {
+      background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 100%);
+      border-color: #a7f3d0;
+    }
+    .mascot-avatar { width: 62px; height: 62px; flex-shrink: 0; }
+    .mascot-speech { font-size: 0.93rem; line-height: 1.58; color: #1e293b; }
+    .mascot-name { font-weight: 800; font-size: 0.82rem; color: var(--blue); display: block; margin-bottom: 3px; }
+    .mascot-bar.volt-theme .mascot-name { color: var(--teal); }
+
+    /* 표지 캐릭터 선택 UI */
+    .cover { text-align: center; padding: 16px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 540px; }
+    .cover h1 { font-size: 1.92rem; line-height: 1.32; margin: 10px 0 8px 0; color: #0f172a; }
+    .cover-desc { max-width: 580px; color: var(--muted); margin: 0 0 22px 0; font-size: 0.95rem; }
+
+    .char-select-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 720px; width: 100%; margin-bottom: 16px; }
+    @media (max-width: 640px) { .char-select-grid { grid-template-columns: 1fr; } }
+
+    .char-card {
+      background: #fff;
+      border: 2px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: 0.2s;
+      text-align: center;
+      position: relative;
+    }
+    .char-card:hover { border-color: #93c5fd; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(15,23,42,0.06); }
+    .char-card.selected-mos {
+      border-color: #2563eb;
+      background: #eff6ff;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.14);
+    }
+    .char-card.selected-volt {
+      border-color: #0d9488;
+      background: #f0fdfa;
+      box-shadow: 0 6px 18px rgba(13, 148, 136, 0.14);
+    }
+    .char-badge {
+      display: inline-block;
+      font-size: 0.74rem;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 6px;
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .selected-mos .char-badge { background: #2563eb; color: #fff; }
+    .selected-volt .char-badge { background: #0d9488; color: #fff; }
+    .char-card h3 { margin: 6px 0 4px 0; font-size: 1.12rem; color: #0f172a; }
+    .char-tags { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+
+    /* 캐릭터 선택 후 등장하는 영역 */
+    .after-char-area {
+      display: none;
+      max-width: 720px;
+      width: 100%;
+      animation: fadeSlideUp 0.35s ease forwards;
+    }
+    .after-char-area.visible {
+      display: block;
+    }
+
+    .char-preview-box {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 13px 18px;
+      margin-bottom: 16px;
+      text-align: left;
+      font-size: 0.91rem;
+      line-height: 1.55;
+      color: #1e293b;
+    }
+
+    .course-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; width: 100%; }
+    @media (max-width: 640px) { .course-grid { grid-template-columns: 1fr; } }
+    .course-btn {
+      background: #fff; border: 2px solid #cbd5e1; border-radius: 14px; padding: 18px; text-align: left; cursor: pointer; transition: 0.18s;
+    }
+    .course-btn:hover { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-2px); }
+    .course-btn strong { display: block; font-size: 1.05rem; margin-bottom: 5px; color: #0f172a; }
+    .course-btn span { font-size: 0.85rem; color: var(--muted); line-height: 1.48; display: block; }
+
+    /* 본문 타이포그래피 & 카드 */
+    .kicker { font-size: 0.8rem; font-weight: 800; color: var(--blue); margin-bottom: 4px; }
+    h2 { margin: 0 0 14px 0; font-size: 1.46rem; color: #0f172a; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+    h3 { margin: 16px 0 8px 0; font-size: 1.06rem; color: #1e293b; }
+    p { line-height: 1.66; color: #334155; font-size: 0.94rem; margin: 8px 0; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; margin: 14px 0; }
+    .card-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 17px; }
+    .card-box.blue { background: var(--blue-soft); border-color: #bfdbfe; }
+    .card-box.teal { background: var(--teal-soft); border-color: #99f6e4; }
+    .card-box.amber { background: var(--amber-soft); border-color: #fde68a; }
+
+    .easy-tag { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 0.76rem; font-weight: 800; padding: 2px 8px; border-radius: 5px; margin-bottom: 6px; }
+    .formula-pill {
+      background: #1e293b; color: #f8fafc; padding: 11px 16px; border-radius: 9px;
+      font-family: 'Cambria Math', serif; font-size: 1.02rem; text-align: center; margin: 10px 0;
+    }
+
+    /* 퀴즈 스타일 */
+    .quiz-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+    .quiz-q { font-weight: 800; font-size: 0.98rem; margin-bottom: 10px; }
+    .quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+    .q-opt {
+      text-align: left; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+      padding: 10px 14px; font-size: 0.91rem; cursor: pointer; transition: 0.15s;
+    }
+    .q-opt:hover { background: #f1f5f9; }
+    .q-opt.ok { background: #dcfce7; border-color: #16a34a; color: #14532d; font-weight: 700; }
+    .q-opt.no { background: #fee2e2; border-color: #dc2626; color: #7f1d1d; }
+    .q-exp { display: none; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: 0.88rem; line-height: 1.55; }
+
+    /* 실습실 UI */
+    .lab-top {
+      background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px 15px;
+      margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+    }
+    .seg { display: inline-flex; background: #e2e8f0; border-radius: 8px; padding: 3px; }
+    .seg button { border: none; background: transparent; padding: 6px 12px; border-radius: 6px; font-size: 0.84rem; font-weight: 700; cursor: pointer; color: #475569; }
+    .seg button.active { background: #fff; color: var(--blue); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .ctrl-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .btn { padding: 8px 14px; border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-gray { background: #e2e8f0; color: #1e293b; }
+    input[type="number"], select { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 0.9rem; }
+
+    .chart-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 13px; }
+    .chart-head { font-weight: 800; font-size: 0.92rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    canvas { width: 100%; height: 230px; display: block; background: #fcfcfd; border: 1px solid #f1f5f9; border-radius: 6px; }
+
+    .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+    .m-card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 9px; padding: 11px; text-align: center; }
+    .m-card .k { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
+    .m-card .v { font-size: 1.15rem; font-weight: 800; color: var(--blue); margin-top: 3px; }
+
+    .log-box { background: #0f172a; color: #cbd5e1; font-family: Consolas, monospace; font-size: 11.5px; height: 105px; overflow-y: auto; padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; margin-top: 8px; }
+
+    /* 하단 페이지 넘김 바 */
+    .footer-nav {
+      max-width: 1040px; width: 100%; margin: 0 auto 26px auto; padding: 0 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .nav-btn {
+      background: #fff; border: 1px solid #cbd5e1; padding: 10px 18px; border-radius: 9px;
+      font-weight: 800; font-size: 0.9rem; cursor: pointer; color: #0f172a;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+    }
+    .nav-btn:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+    .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .page-badge { font-weight: 800; font-size: 0.92rem; background: #fff; padding: 7px 16px; border-radius: 999px; border: 1px solid #e2e8f0; }
+
+    table.rep { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9rem; }
+    table.rep th, table.rep td { border: 1px solid #cbd5e1; padding: 9px 11px; text-align: left; }
+    table.rep th { background: #f1f5f9; }
+    table.rep input { width: 100%; padding: 6px 8px; border: 1px solid #94a3b8; border-radius: 5px; }
+
+    /* 8장 환영 배너 */
+    .welcome-card {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-top: 18px;
+      border: 1px solid #334155;
+      box-shadow: 0 8px 20px rgba(15,23,42,0.12);
+    }
+    .welcome-card h3 { color: #38bdf8; margin: 0 0 8px 0; font-size: 1.16rem; }
+    .welcome-card p { color: #e2e8f0; margin: 6px 0; font-size: 0.95rem; line-height: 1.65; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <h1>MOSFET I-V 커브 트레이서 측정 시스템</h1>
-      <span id="statusBadge" class="status-pill">미연결 (115200 bps)</span>
-    </div>
 
-    <!-- 부품 보호 안전 체크리스트 -->
-    <div class="safety-box">
-      <div class="safety-title">하드웨어 보호 체크리스트 (측정 전 3항목 모두 확인 시 측정 활성화)</div>
-      <div class="safety-list">
-        <label><input type="checkbox" class="chk-safe" /> 1. 30kΩ/10kΩ 분압 저항의 GND 접지선 연결 확인 (12V 유입 방지)</label>
-        <label><input type="checkbox" class="chk-safe" /> 2. 외부 +12V 선이 LMC6482(8번)와 TIP41C(C)에만 연결됨 확인</label>
-        <label><input type="checkbox" class="chk-safe" /> 3. 2N7000 소자 핀(S-G-D) 방향 및 1Ω 션트 저항 연결 확인</label>
-      </div>
-    </div>
-
-    <!-- 제어 버튼 패널 -->
-    <div class="toolbar">
-      <button id="btnConn" class="btn-primary">1. 보드 연결</button>
-      <button id="btnDisc" class="btn-sub" disabled>연결 해제</button>
-
-      <div class="input-group">
-        <label for="vgsInput">목표 V<sub>GS</sub> (0~3V):</label>
-        <input id="vgsInput" type="number" step="0.1" min="0" max="3" value="2.0" />
+  <!-- 상단 고정 바 -->
+  <header class="topbar">
+    <div class="top-row">
+      <div class="brand">
+        <button class="btn-menu" id="btnOpenToc">≡ 목차</button>
+        <span>손에 잡히는 MOSFET 실전 워크북</span>
       </div>
 
-      <button id="btnRun" class="btn-success" disabled title="안전 체크리스트 3개를 모두 체크해야 활성화됩니다">2. 안전 측정 시작</button>
-      <button id="btnGraph" class="btn-sub" disabled>기존 데이터 그래프 불러오기 (g)</button>
-      <button id="btnStop" class="btn-danger" disabled>긴급 중단 (x)</button>
-    </div>
+      <div class="progress-wrap" title="페이지를 읽고 퀴즈와 실습을 완료하면 100%가 됩니다">
+        <span class="progress-label">학습 성취도</span>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <span class="progress-pct" id="progressPct">0%</span>
+      </div>
 
-    <div id="alertBanner"></div>
-
-    <!-- 6개 결과 그래프 -->
-    <div class="grid">
-      <div class="card">
-        <div class="card-head"><h3>1. MOSFET 출력 특성 (I<sub>D</sub> - V<sub>DS</sub>)</h3><span id="info1">대기 중</span></div>
-        <canvas id="c1"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>2. TIP41C 베이스-이미터 전압</h3><span>V<sub>B</sub> / V<sub>E</sub></span></div>
-        <canvas id="c2"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>3. TIP41C 전압 전달률 (%)</h3><span>정상 기준: 95~105%</span></div>
-        <canvas id="c3"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>4. DAC C - V<sub>DS</sub> 전달 특성</h3><span>실측 / 보정 V<sub>DS</sub></span></div>
-        <canvas id="c4"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>5. DAC C - V<sub>DS</sub> 선형 회귀 비교</h3><span>실측 vs 예측</span></div>
-        <canvas id="c5"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>6. 선형 회귀 잔차 (V)</h3><span>허용 오차 ±50mV</span></div>
-        <canvas id="c6"></canvas>
+      <div class="hw-box">
+        <span id="hwPill" class="hw-pill">보드: 미연결</span>
+        <button class="btn-menu" id="btnTopConn" style="background:#2563eb;">USB 보드 연결</button>
       </div>
     </div>
+  </header>
 
-    <!-- 시리얼 로그 및 CSV 저장 -->
-    <div class="log-card">
-      <div class="log-head">
-        <h3>통신 및 보호 동작 로그</h3>
-        <div class="dl-group">
-          <button id="dlLog" class="btn-sub btn-sm">로그(.txt) 저장</button>
-          <button id="dl1" class="btn-sub btn-sm" disabled>1_예비측정.csv</button>
-          <button id="dl2" class="btn-sub btn-sm" disabled>2_본측정_IV.csv</button>
-          <button id="dl3" class="btn-sub btn-sm" disabled>3_선형회귀.csv</button>
+  <!-- 목차 사이드바 -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:12px;">
+      <strong>워크북 목차 (총 9페이지)</strong>
+      <button class="btn-menu" id="btnCloseToc" style="padding:4px 9px;">✕</button>
+    </div>
+    <div id="tocList"></div>
+  </aside>
+
+  <!-- 책 본문 -->
+  <main class="stage">
+    <div class="sheet" id="bookSheet">
+
+      <!-- PAGE 0: 표지 (처음엔 캐릭터만 보이고, 클릭 시 성격 + 초보자/이론아는사람 선택칸 등장) -->
+      <section class="page active" data-title="표지: 파트너 & 코스 선택" data-tag="표지">
+        <div class="cover">
+          <div style="background:#dbeafe; color:#1d4ed8; font-weight:800; font-size:0.8rem; padding:4px 13px; border-radius:999px;">
+            전자전기공학부 커브 트레이서 프로젝트 교보재
+          </div>
+          <h1>수식 대신 눈과 손으로 익히는<br>MOSFET 기초 & 실전 측정 가이드</h1>
+          <p class="cover-desc" id="coverGuideText">
+            함께할 실험 파트너 캐릭터를 먼저 선택해 주세요!
+          </p>
+
+          <!-- 1단계: 파트너 캐릭터 2종 선택 -->
+          <div class="char-select-grid">
+            <div class="char-card" id="cardMos" onclick="selectPartner('mos')">
+              <span class="char-badge" id="badgeMos">클릭해서 선택</span>
+              <div>
+                <svg id="coverSvgMos" width="78" height="78" viewBox="0 0 120 120">
+                  <rect x="26" y="20" width="68" height="54" rx="14" fill="#1e293b" />
+                  <rect x="34" y="28" width="52" height="36" rx="8" fill="#38bdf8" />
+                  <circle cx="49" cy="45" r="4.5" fill="#0f172a" />
+                  <circle cx="71" cy="45" r="4.5" fill="#0f172a" />
+                  <path d="M51 54 Q60 62 69 54" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round" />
+                  <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+                  <rect x="57" y="74" width="6" height="34" rx="3" fill="#f59e0b" />
+                  <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+                </svg>
+              </div>
+              <h3>모스 (MOS)</h3>
+              <div class="char-tags">#다정함 #비유장인 #응원단장</div>
+            </div>
+
+            <div class="char-card" id="cardVolt" onclick="selectPartner('volt')">
+              <span class="char-badge" id="badgeVolt">클릭해서 선택</span>
+              <div>
+                <svg id="coverSvgVolt" width="78" height="78" viewBox="0 0 120 120">
+                  <rect x="26" y="20" width="68" height="54" rx="12" fill="#0f172a" />
+                  <rect x="34" y="28" width="52" height="36" rx="7" fill="#10b981" />
+                  <rect x="38" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+                  <rect x="63" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+                  <line x1="57" y1="43" x2="63" y2="43" stroke="#ecfdf5" stroke-width="2" />
+                  <path d="M52 56 L68 56" stroke="#064e3b" stroke-width="3" stroke-linecap="round" />
+                  <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+                  <rect x="57" y="74" width="6" height="34" rx="3" fill="#fbbf24" />
+                  <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+                </svg>
+              </div>
+              <h3>볼트 (VOLT)</h3>
+              <div class="char-tags">#츤데레선배 #핵심요약 #실전감각</div>
+            </div>
+          </div>
+
+          <!-- 2단계: 캐릭터 클릭 시 나타나는 성격 미리보기 + 초보자/이론아는사람 선택칸 -->
+          <div class="after-char-area" id="afterCharArea">
+            <div class="char-preview-box" id="charPreviewBox"></div>
+
+            <div class="course-grid">
+              <button class="course-btn" onclick="startCourse(1)">
+                <strong>🌱 초보자용 (개념부터 차근차근)</strong>
+                <span>MOSFET이 처음이라면 여기로! 실물 부품 구경과 쉬운 원리부터 시작합니다.</span>
+              </button>
+              <button class="course-btn" onclick="startCourse(4)">
+                <strong>🚀 이론 아는 사람용 (바로 실전 측정)</strong>
+                <span>기본 개념을 이미 안다면 이론을 건너뛰고 바로 4장 측정 실습실로 들어갑니다.</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div id="log">Chrome 또는 Edge에서 [1. 보드 연결]을 누르고 상단 안전 체크리스트 3개를 확인하세요.\n</div>
+      </section>
+
+      <!-- PAGE 1: 1장 쉬운 개념 + 실물 부품 도해 -->
+      <section class="page" data-title="1장. 실물 구경 & 수도꼭지 원리" data-tag="개념">
+        <div class="kicker">STEP 01 · 실물 소자와 직관적 원리</div>
+        <h2>1장. 실제 MOSFET 부품 구경과 '전압 다리' 원리</h2>
+
+        <div class="mascot-bar" data-page-speech="1"></div>
+
+        <div class="grid-2">
+          <div class="card-box">
+            <span class="easy-tag">실물 부품 가이드 ①</span>
+            <h3 style="margin-top:2px;">우리가 쓸 실제 소자: 2N7000 (TO-92)</h3>
+            <svg viewBox="0 0 320 135" style="width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin:6px 0;">
+              <path d="M110 20 L210 20 L210 65 Q160 76 110 65 Z" fill="#1e293b" />
+              <rect x="110" y="16" width="100" height="8" rx="2" fill="#334155" />
+              <text x="160" y="42" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="bold">2N7000</text>
+              <text x="160" y="56" text-anchor="middle" fill="#94a3b8" font-size="9">평평한 면을 앞으로 봤을 때</text>
+              <rect x="128" y="68" width="5" height="42" fill="#94a3b8" />
+              <rect x="157" y="70" width="5" height="44" fill="#f59e0b" />
+              <rect x="187" y="68" width="5" height="42" fill="#94a3b8" />
+              <text x="130" y="124" text-anchor="middle" font-size="10" font-weight="bold" fill="#0f172a">1: Source (S)</text>
+              <text x="160" y="127" text-anchor="middle" font-size="10" font-weight="bold" fill="#d97706">2: Gate (G)</text>
+              <text x="190" y="124" text-anchor="middle" font-size="10" font-weight="bold" fill="#0f172a">3: Drain (D)</text>
+            </svg>
+            <p style="font-size:0.86rem; margin:0;">
+              실제 브레드보드에 꽂을 때 <b>평평한 글씨 면을 정면으로 보고 왼쪽부터 S - G - D</b> 순서입니다. (거꾸로 꽂으면 측정이 안 돼요!)
+            </p>
+          </div>
+
+          <div class="card-box teal">
+            <span class="easy-tag" style="background:#ccfbf1; color:#0f766e;">실제 측정 장비 구성 ②</span>
+            <h3 style="margin-top:2px;">ESP32-S3 커브 트레이서 보드</h3>
+            <svg viewBox="0 0 320 135" style="width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin:6px 0;">
+              <rect x="14" y="25" width="76" height="82" rx="6" fill="#0f172a" />
+              <text x="52" y="62" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold">ESP32-S3</text>
+              <text x="52" y="76" text-anchor="middle" fill="#cbd5e1" font-size="8">두뇌 (USB 통신)</text>
+
+              <line x1="90" y1="50" x2="122" y2="50" stroke="#2563eb" stroke-width="2" />
+              <rect x="122" y="28" width="76" height="40" rx="5" fill="#eff6ff" stroke="#2563eb" />
+              <text x="160" y="46" text-anchor="middle" fill="#1d4ed8" font-size="9.5" font-weight="bold">MCP4728 DAC</text>
+              <text x="160" y="59" text-anchor="middle" fill="#475569" font-size="8">전압 만들어주기</text>
+
+              <line x1="122" y1="92" x2="90" y2="92" stroke="#0d9488" stroke-width="2" />
+              <rect x="122" y="74" width="76" height="40" rx="5" fill="#f0fdfa" stroke="#0d9488" />
+              <text x="160" y="92" text-anchor="middle" fill="#0f766e" font-size="9.5" font-weight="bold">ADS1115 ADC</text>
+              <text x="160" y="105" text-anchor="middle" fill="#475569" font-size="8">전압·전류 읽기</text>
+
+              <line x1="198" y1="68" x2="226" y2="68" stroke="#d97706" stroke-width="2" />
+              <rect x="226" y="34" width="80" height="68" rx="6" fill="#fffbeb" stroke="#f59e0b" />
+              <text x="266" y="60" text-anchor="middle" fill="#b45309" font-size="9.5" font-weight="bold">2N7000 + 보호회로</text>
+              <text x="266" y="75" text-anchor="middle" fill="#78350f" font-size="8">30k/10k 분압 안전</text>
+            </svg>
+            <p style="font-size:0.86rem; margin:0;">
+              수백만 원짜리 계측기 대신 <b>ESP32-S3 + DAC + ADC</b> 조합으로 전압을 쏘고 전류를 읽어 그래프를 그립니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-box blue" style="margin-top:12px;">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+            <strong>[직접 해보기] 게이트 손잡이(<i>V</i><sub>GS</sub>) 돌려서 전자 다리 만들기:</strong>
+            <input type="range" id="vgsDemoSlider" min="0" max="3.0" step="0.1" value="0.5" style="flex:1; min-width:180px; accent-color:#2563eb;" />
+            <span id="vgsDemoVal" style="font-weight:800; color:#1d4ed8;">0.5 V</span>
+            <span id="vgsDemoState" style="font-size:0.83rem; font-weight:800; padding:4px 10px; border-radius:6px; background:#fef3c7; color:#92400e;">다리 끊김 (OFF)</span>
+          </div>
+          <svg viewBox="0 0 680 165" style="width:100%; max-height:170px; background:#fff; border:1px solid #cbd5e1; border-radius:8px;">
+            <rect x="60" y="55" width="560" height="98" fill="#e2e8f0" stroke="#94a3b8" />
+            <text x="340" y="138" text-anchor="middle" font-size="12" fill="#475569" font-weight="bold">p형 실리콘 몸통 (평소엔 전자가 못 지나가는 벽!)</text>
+            <rect id="svgDepletion" x="105" y="55" width="470" height="24" fill="#cbd5e1" />
+            <rect id="svgChannel" x="210" y="55" width="260" height="0" fill="#2563eb" />
+            <rect x="110" y="55" width="100" height="38" rx="4" fill="#38bdf8" stroke="#0284c4" />
+            <text x="160" y="78" text-anchor="middle" font-size="12" fill="#0f172a" font-weight="bold">Source (출발)</text>
+            <rect x="470" y="55" width="100" height="38" rx="4" fill="#38bdf8" stroke="#0284c4" />
+            <text x="520" y="78" text-anchor="middle" font-size="12" fill="#0f172a" font-weight="bold">Drain (도착)</text>
+            <rect x="210" y="42" width="260" height="13" fill="#fef08a" stroke="#eab308" />
+            <text x="340" y="52" text-anchor="middle" font-size="9.5" fill="#854d0e" font-weight="bold">절연막 (유리벽처럼 전기가 직접 통하지 않음)</text>
+            <rect x="210" y="18" width="260" height="24" fill="#334155" />
+            <text x="340" y="34" text-anchor="middle" font-size="11.5" fill="#fff" font-weight="bold">Gate 손잡이 (+VGS)</text>
+            <text id="svgChanLabel" x="340" y="69" text-anchor="middle" font-size="11" fill="#fff" font-weight="bold"></text>
+          </svg>
+          <p style="font-size:0.86rem; margin-top:6px;">
+            * 전공 용어 매칭: 문턱전압(<b><i>V</i><sub>TN</sub> &approx; 1.5V</b>) 이상으로 게이트 전압을 높여야 기판 표면에 전자들이 모여 통로가 생기는데, 전공 시간에는 이를 <b>강반전(Strong Inversion)</b>이라고 배웁니다!
+          </p>
+        </div>
+      </section>
+
+      <!-- PAGE 2: 2장 쉬운 개념 - 교과서 이상적인 I-V 곡선 -->
+      <section class="page" data-title="2장. 교과서 속 이상적인 I-V 곡선" data-tag="개념">
+        <div class="kicker">STEP 02 · 교과서 이론 그래프의 모양</div>
+        <h2>2장. 교과서에서 배운 이상적인 <i>I</i><sub>D</sub> - <i>V</i><sub>DS</sub> 곡선</h2>
+
+        <div class="mascot-bar" data-page-speech="2"></div>
+
+        <div class="grid-2">
+          <div class="card-box">
+            <span class="easy-tag">1단계: 잠김 (Cutoff, <i>V</i><sub>GS</sub> &lt; <i>V</i><sub>TN</sub>)</span>
+            <p style="font-size:0.89rem;">
+              문턱전압보다 게이트 전압이 작아서 다리가 안 놓인 상태입니다. 드레인 전압을 높여도 전류는 <b>0 mA</b>입니다.
+            </p>
+            <span class="easy-tag">2단계: 비례 증가 (Linear, <i>V</i><sub>DS</sub> &lt; <i>V</i><sub>GS</sub> &minus; <i>V</i><sub>TN</sub>)</span>
+            <p style="font-size:0.89rem;">
+              다리가 활짝 열려 있어서 드레인 전압(<i>V</i><sub>DS</sub>)을 높이는 만큼 전류(<i>I</i><sub>D</sub>)도 비례해서 커집니다.
+            </p>
+            <span class="easy-tag" style="background:#fef3c7; color:#92400e;">3단계: 포화 (Saturation, <i>V</i><sub>DS</sub> &ge; <i>V</i><sub>GS</sub> &minus; <i>V</i><sub>TN</sub>)</span>
+            <p style="font-size:0.89rem; margin-bottom:0;">
+              드레인 쪽 끝이 좁아지는 <b>핀치오프(Pinch-off)</b>가 일어나며, 이론상 전류가 더 늘어나지 않고 <b>평평한 수평선</b>을 유지합니다.
+            </p>
+          </div>
+
+          <div class="card-box blue">
+            <span class="easy-tag">교과서 이론 그래프 미리보기</span>
+            <canvas id="cTheoryPreview" style="height:210px;"></canvas>
+            <div class="formula-pill" style="font-size:0.92rem; padding:8px 12px; margin-top:8px;">
+              이론 포화 전류: <i>I</i><sub>D(sat)</sub> = <i>K</i><sub>n</sub> (<i>V</i><sub>GS</sub> &minus; <i>V</i><sub>TN</sub>)<sup>2</sup> (수평선!)
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE 3: 중간 퀴즈 1 -->
+      <section class="page" data-title="3장. [퀴즈 1] 기초 개념 체크!" data-tag="퀴즈">
+        <div class="kicker">QUIZ 01 · 실습실 입장 전 기초 워밍업</div>
+        <h2>3장. [중간 퀴즈 1] 여기까지 잘 이해했는지 확인해 볼까요?</h2>
+
+        <div class="mascot-bar" data-page-speech="3"></div>
+
+        <div class="quiz-card" data-ans="1">
+          <div class="quiz-q">Q1. 실제 2N7000 부품(평평한 글씨 면을 앞으로 봤을 때)의 가운데 다리(2번 핀)는 무엇일까요?</div>
+          <div class="quiz-opts">
+            <button class="q-opt" onclick="checkQuiz(this, 0)">① Source (전자가 출발하는 곳)</button>
+            <button class="q-opt" onclick="checkQuiz(this, 1)">② Gate (전압을 걸어 채널을 여닫는 손잡이)</button>
+            <button class="q-opt" onclick="checkQuiz(this, 2)">③ Drain (전자가 도착하는 곳)</button>
+          </div>
+          <div class="q-exp" data-exp-base="2N7000 TO-92 패키지는 정면 기준 왼쪽부터 1: Source, 2: Gate, 3: Drain 순서입니다."></div>
+        </div>
+
+        <div class="quiz-card" data-ans="2">
+          <div class="quiz-q">Q2. 문턱전압 <i>V</i><sub>TN</sub> = 1.5 V 인 소자에 게이트 전압 <i>V</i><sub>GS</sub> = 2.5 V 를 걸었습니다. 이론상 전류가 포화되기 시작하는 드레인 전압 <i>V</i><sub>DS(sat)</sub>는?</div>
+          <div class="quiz-opts">
+            <button class="q-opt" onclick="checkQuiz(this, 0)">① 4.0 V</button>
+            <button class="q-opt" onclick="checkQuiz(this, 1)">② 2.5 V</button>
+            <button class="q-opt" onclick="checkQuiz(this, 2)">③ 1.0 V</button>
+          </div>
+          <div class="q-exp" data-exp-base="VDS(sat) = VGS - VTN = 2.5 V - 1.5 V = 1.0 V 입니다."></div>
+        </div>
+
+        <div class="quiz-card" data-ans="0">
+          <div class="quiz-q">Q3. 교과서 이론 수식대로라면, 포화 영역(<i>V</i><sub>DS</sub> &ge; <i>V</i><sub>DS(sat)</sub>)에서 <i>I</i><sub>D</sub> - <i>V</i><sub>DS</sub> 그래프는 어떤 모양이어야 할까요?</div>
+          <div class="quiz-opts">
+            <button class="q-opt" onclick="checkQuiz(this, 0)">① 전류가 일정하게 유지되는 완벽한 수평선</button>
+            <button class="q-opt" onclick="checkQuiz(this, 1)">② 전류가 0으로 뚝 떨어지는 수직선</button>
+            <button class="q-opt" onclick="checkQuiz(this, 2)">③ 아래로 볼록한 포물선</button>
+          </div>
+          <div class="q-exp" data-exp-base="이상적인 교과서 수식에는 VDS 항이 사라지므로 완벽한 수평선이 됩니다. 이제 다음 장에서 실제 측정값과 비교해 봅시다!"></div>
+        </div>
+      </section>
+
+      <!-- PAGE 4: 4장 실습 1 -->
+      <section class="page" data-title="4장. [실습 1] 이론처럼 나올까? 직접 측정!" data-tag="실습">
+        <div class="kicker">LAB 01 · 이론 예측 vs 실제 소자 측정 대결</div>
+        <h2>4장. [실습 1] 과연 이론처럼 완벽한 수평선이 나올까? 직접 재보자!</h2>
+
+        <div class="mascot-bar" data-page-speech="4"></div>
+
+        <div class="lab-top">
+          <div>
+            <strong style="font-size:0.88rem;">측정 모드:</strong>
+            <div class="seg" style="margin-left:6px;">
+              <button class="active" id="modeSim" onclick="setLabMode('sim')">가상 실험실 (실측 데이터 시뮬)</button>
+              <button id="modeHw" onclick="setLabMode('hw')">실제 ESP32-S3 보드 연동</button>
+            </div>
+          </div>
+          <label style="font-size:0.84rem; font-weight:700; cursor:pointer; color:#1d4ed8;">
+            <input type="checkbox" id="chkShowTheory" checked onchange="drawOutCharts()" /> 교과서 이론선(점선) 같이 보기
+          </label>
+        </div>
+
+        <div id="hwSafeBox" class="card-box amber" style="display:none; padding:10px 14px; margin-bottom:12px;">
+          <label style="font-size:0.85rem; font-weight:700; cursor:pointer;">
+            <input type="checkbox" id="chkHwSafe" checked /> [보드 보호 확인] 30k&Omega;/10k&Omega; 분압 저항 GND 연결 및 +12V 배선 이상 없음 (<i>V</i><sub>GS</sub> 최대 3.0V 자동 제한)
+          </label>
+        </div>
+
+        <div class="ctrl-row">
+          <label style="font-size:0.88rem; font-weight:700;">게이트 전압 <i>V</i><sub>GS</sub> (0~3.0V):
+            <input type="number" id="labVgs" min="0" max="3.0" step="0.2" value="2.4" style="width:72px;" />
+          </label>
+          <button class="btn btn-blue" id="btnRunOut">1개 곡선 측정하기</button>
+          <button class="btn btn-green" id="btnRunFamily">다중 <i>V</i><sub>GS</sub> 패밀리 측정 (1.6~2.8V)</button>
+          <button class="btn btn-gray" id="btnClearOut">초기화</button>
+          <button class="btn btn-red" id="btnStopHw" disabled>긴급 중단 (x)</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="chart-card">
+            <div class="chart-head">
+              <span>① 이론(점선) vs 실측(실선) 출력 특성 (<i>I</i><sub>D</sub> - <i>V</i><sub>DS</sub>)</span>
+              <span id="outCount" style="font-size:0.78rem; color:var(--blue);">곡선 0개</span>
+            </div>
+            <canvas id="cOutIV"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-head">
+              <span>② 포화 영역 기울기 분석 (<i>g</i><sub>d</sub>, 출력 저항 <i>r</i><sub>ds</sub>)</span>
+              <span style="font-size:0.78rem; color:var(--red);">수평이 아니라 올라간다!</span>
+            </div>
+            <canvas id="cOutGd"></canvas>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div class="m-card"><div class="k">선택 <i>V</i><sub>GS</sub></div><div class="v" id="mOutVgs">-</div></div>
+          <div class="m-card"><div class="k">포화 시작 <i>V</i><sub>DS(sat)</sub></div><div class="v" id="mOutVdsat">-</div></div>
+          <div class="m-card"><div class="k">포화 기울기 <i>g</i><sub>d</sub></div><div class="v" id="mOutGd">-</div></div>
+          <div class="m-card"><div class="k">출력 저항 <i>r</i><sub>ds</sub></div><div class="v" id="mOutRds">-</div></div>
+        </div>
+
+        <div id="discoveryAlert" class="card-box amber" style="display:none; margin-top:8px;">
+          <strong>👀 어라? 그래프를 자세히 보세요!</strong> 교과서 이론선(회색 점선)은 포화 영역에서 완벽한 수평인데, <b>실제 측정 곡선(실선)은 오른쪽으로 갈수록 슬금슬금 위로 올라가고 있습니다!</b> 왜 이런 차이가 생겼을까요? <b>[다음 장 ▶]</b>을 넘겨 비밀을 확인해 보세요!
+        </div>
+
+        <details style="margin-top:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 12px;">
+          <summary style="cursor:pointer; font-size:0.83rem; font-weight:700; color:#475569;">[개발자/조원 전용] 시리얼 원시 로그 보기</summary>
+          <div id="logBox" class="log-box">보드 통신 대기 중...\n</div>
+        </details>
+      </section>
+
+      <!-- PAGE 5: 5장 해설 -->
+      <section class="page" data-title="5장. 왜 이론과 다르게 나왔을까?" data-tag="해설">
+        <div class="kicker">STEP 03 · 실험 결과의 물리적 원인 파헤치기</div>
+        <h2>5장. 방금 본 그래프가 이론과 달랐던 4가지 이유!</h2>
+
+        <div class="mascot-bar" data-page-speech="5"></div>
+
+        <div class="grid-2">
+          <div class="card-box blue">
+            <span class="easy-tag">이유 ① 포화 구간이 위로 올라간 범인!</span>
+            <h3 style="margin-top:2px;">채널 길이 변조 (Channel Length Modulation)</h3>
+            <p style="font-size:0.89rem;">
+              드레인 전압(<i>V</i><sub>DS</sub>)을 계속 높이면 드레인 쪽 공핍층이 넓어지면서 핀치오프 지점이 소스 쪽으로 살짝 밀려납니다.
+              그러면 전자가 건너가야 할 <b>유효 채널 길이(<i>L'</i> = <i>L</i> &minus; &Delta;<i>L</i>)가 짧아져서</b> 저항이 줄고 전류가 조금씩 더 흐르게 됩니다!<br>
+              &bull; 이때 올라가는 기울기가 <b>채널 컨덕턴스(<i>g</i><sub>d</sub>)</b>이고, 그 역수(1/<i>g</i><sub>d</sub>)가 <b>출력 저항(<i>r</i><sub>ds</sub>)</b>입니다.
+            </p>
+          </div>
+
+          <div class="card-box teal">
+            <span class="easy-tag" style="background:#ccfbf1; color:#0f766e;">이유 ② 스위치 민감도 (전달 컨덕턴스)</span>
+            <h3 style="margin-top:2px;">전달 컨덕턴스 (<i>g</i><sub>m</sub>)</h3>
+            <p style="font-size:0.89rem;">
+              게이트 전압을 조금 바꿀 때 드레인 전류가 얼마나 크게 변하는지(증폭 능력)를 나타냅니다.
+              실제 소자에서는 게이트 수직 전기장이 강해지면 표면 산란(Surface scattering) 때문에 이동도가 살짝 줄어 <i>g</i><sub>m</sub> 증가폭이 완만해집니다.
+            </p>
+          </div>
+
+          <div class="card-box">
+            <span class="easy-tag">이유 ③ 문턱전압 아래에서도 흐르는 미세 전류</span>
+            <h3 style="margin-top:2px;">Subthreshold Swing (<i>SS</i>)</h3>
+            <p style="font-size:0.89rem;">
+              이론에서는 <i>V</i><sub>GS</sub> &lt; <i>V</i><sub>TN</sub> 이면 전류가 딱 0이라고 가정하지만, 실제로는 확산(Diffusion)에 의해 미세 전류가 지수함수적으로 흐릅니다. 전류를 10배 키우는 데 필요한 전압(mV/dec)을 <b><i>SS</i></b>라 하며 상온 한계는 <b>60 mV/dec</b>입니다.
+            </p>
+          </div>
+
+          <div class="card-box amber">
+            <span class="easy-tag" style="background:#fef3c7; color:#92400e;">이유 ④ 온도와 소자 간 편차</span>
+            <h3 style="margin-top:2px;">온도 상승 & 부품별 편차</h3>
+            <p style="font-size:0.89rem;">
+              소자가 뜨거워지면 원자 진동이 심해져 전자 이동 속도(&mu;<sub>n</sub>)가 느려지고 <i>V</i><sub>TN</sub>도 변합니다. 또한 같은 2N7000 모델이라도 공정 미세 차이로 부품마다 <i>V</i><sub>TN</sub>이 조금씩 다릅니다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE 6: 6장 중간 퀴즈 2 -->
+      <section class="page" data-title="6장. [퀴즈 2] 오차 원인 & 파라미터 점검" data-tag="퀴즈">
+        <div class="kicker">QUIZ 02 · 방금 배운 물리 현상 복습</div>
+        <h2>6장. [중간 퀴즈 2] 그래프가 이론과 달랐던 이유 맞히기</h2>
+
+        <div class="mascot-bar" data-page-speech="6"></div>
+
+        <div class="quiz-card" data-ans="1">
+          <div class="quiz-q">Q1. 4장 실습에서 실제 측정한 <i>I</i><sub>D</sub> - <i>V</i><sub>DS</sub> 그래프가 교과서 점선(수평)과 달리 포화 영역에서 완만하게 상승한 이유는?</div>
+          <div class="quiz-opts">
+            <button class="q-opt" onclick="checkQuiz(this, 0)">① USB 케이블 길이가 너무 길어서</button>
+            <button class="q-opt" onclick="checkQuiz(this, 1)">② 채널 길이 변조(Channel Length Modulation)로 유효 채널 길이 <i>L'</i> 이 짧아졌기 때문</button>
+            <button class="q-opt" onclick="checkQuiz(this, 2)">③ 게이트 산화막이 완전히 도체로 변해서</button>
+          </div>
+          <div class="q-exp" data-exp-base="VDS가 증가하면 유효 채널 길이 L' 이 줄어들어 포화 전류가 (1 + λVDS) 비율로 증가합니다."></div>
+        </div>
+
+        <div class="quiz-card" data-ans="0">
+          <div class="quiz-q">Q2. 스위치가 아주 빠릿빠릿하게 켜지고 꺼지는 우수한 트랜지스터일수록 Subthreshold Swing (<i>SS</i>) 값은?</div>
+          <div class="quiz-opts">
+            <button class="q-opt" onclick="checkQuiz(this, 0)">① 60 mV/dec 에 가깝게 작을수록 좋다.</button>
+            <button class="q-opt" onclick="checkQuiz(this, 1)">② 1000 mV/dec 이상으로 클수록 좋다.</button>
+            <button class="q-opt" onclick="checkQuiz(this, 2)">③ 항상 0 V 이다.</button>
+          </div>
+          <div class="q-exp" data-exp-base="적은 게이트 전압 변화로 전류를 10배씩 키울 수 있어야 하므로 SS가 작을수록(이론 한계 60 mV/dec) 우수합니다."></div>
+        </div>
+      </section>
+
+      <!-- PAGE 7: 7장 실습 2 -->
+      <section class="page" data-title="7장. [실습 2] 전달 특성 & 파라미터 추출" data-tag="실습">
+        <div class="kicker">LAB 02 · 문턱전압(VTN), 전도계수(Kn), gm, SS 직접 추출</div>
+        <h2>7장. [실습 2] <i>I</i><sub>D</sub> - <i>V</i><sub>GS</sub> 측정 및 핵심 파라미터 뽑아내기</h2>
+
+        <div class="mascot-bar" data-page-speech="7"></div>
+
+        <div class="ctrl-row">
+          <label style="font-size:0.86rem; font-weight:700;">실험 조건 선택:
+            <select id="trMode">
+              <option value="std">기본 측정: 2N7000 #1 (상온 25°C, VDS = 3.0V)</option>
+              <option value="dev">소자 간 편차 비교: 2N7000 #1 vs #2 vs #3</option>
+              <option value="temp">온도 변화 실험: 25°C vs 55°C vs 85°C</option>
+            </select>
+          </label>
+          <button class="btn btn-blue" id="btnRunTr">전달 특성 측정 시작</button>
+          <button class="btn btn-gray" id="btnClearTr">그래프 초기화</button>
+          <label class="btn btn-gray" style="display:inline-block;">
+            실측 CSV 불러오기 <input type="file" id="csvFile" accept=".csv" style="display:none;" />
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <div class="chart-card">
+            <div class="chart-head">
+              <span>③ 전달 특성 곡선 (<i>I</i><sub>D</sub> - <i>V</i><sub>GS</sub>)</span>
+              <span style="font-size:0.78rem; color:var(--muted);"><i>V</i><sub>DS</sub> = 3.0 V 고정</span>
+            </div>
+            <canvas id="cTrID"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-head">
+              <span>④ &radic;<i>I</i><sub>D</sub> - <i>V</i><sub>GS</sub> 직선 외삽 (<i>V</i><sub>TN</sub>, <i>K</i><sub>n</sub> 추출)</span>
+              <span style="font-size:0.78rem; color:var(--red);">점선: 외삽 직선</span>
+            </div>
+            <canvas id="cTrSqrt"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card" style="margin-top:12px;">
+          <div class="chart-head">
+            <span>⑤ 문턱전압 이하 특성 (log<sub>10</sub><i>I</i><sub>D</sub> - <i>V</i><sub>GS</sub>) &mdash; Subthreshold Swing (<i>SS</i>)</span>
+            <span style="font-size:0.78rem; color:var(--teal);">Weak Inversion 기울기</span>
+          </div>
+          <canvas id="cTrLog" style="height:190px;"></canvas>
+        </div>
+
+        <div class="metric-row">
+          <div class="m-card"><div class="k">문턱전압 <i>V</i><sub>TN</sub></div><div class="v" id="mTrVtn">-</div></div>
+          <div class="m-card"><div class="k">전도 계수 <i>K</i><sub>n</sub></div><div class="v" id="mTrKn">-</div></div>
+          <div class="m-card"><div class="k">최대 전달컨덕턴스 <i>g</i><sub>m</sub></div><div class="v" id="mTrGm">-</div></div>
+          <div class="m-card"><div class="k">Subthreshold Swing <i>SS</i></div><div class="v" id="mTrSS">-</div></div>
+        </div>
+      </section>
+
+      <!-- PAGE 8: 8장 최종 리포트 & 파트너별 환영 메시지 -->
+      <section class="page" data-title="8장. [완주] 리포트 완성 & 학부 환영" data-tag="완주">
+        <div class="kicker">FINAL WORKBOOK · 성취도 100% 달성 미션</div>
+        <h2>8장. [최종 미션] 2N7000 소자 특성 분석 리포트 완성</h2>
+        <p>
+          4장과 7장에서 구한 우리 소자의 핵심 파라미터를 아래 표에 채워 넣고 CSV로 저장해 보세요.
+        </p>
+
+        <div class="ctrl-row">
+          <button class="btn btn-blue" id="btnAutoFill">실습실 추출값 자동 채우기</button>
+          <button class="btn btn-green" id="btnExportCSV">최종 실습 리포트(.csv) 저장</button>
+        </div>
+
+        <table class="rep">
+          <thead>
+            <tr>
+              <th style="width:27%;">파라미터</th>
+              <th style="width:25%;">추출 결과값</th>
+              <th style="width:23%;">데이터시트 기준</th>
+              <th style="width:25%;">쉽게 이해하는 의미</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>문턱전압 (<i>V</i><sub>TN</sub>)</td>
+              <td><input type="text" id="rVtn" placeholder="예: 1.55 V" /></td>
+              <td>0.8 V ~ 3.0 V</td>
+              <td>스위치가 켜지기 시작하는 최소 전압</td>
+            </tr>
+            <tr>
+              <td>전도 계수 (<i>K</i><sub>n</sub>)</td>
+              <td><input type="text" id="rKn" placeholder="예: 36.0 mA/V²" /></td>
+              <td>W/L 및 이동도 비례</td>
+              <td>전압 대비 전류를 얼마나 잘 흘리는가</td>
+            </tr>
+            <tr>
+              <td>전달 컨덕턴스 (<i>g</i><sub>m</sub>)</td>
+              <td><input type="text" id="rGm" placeholder="예: 95.2 mS" /></td>
+              <td>&ge; 100 mS</td>
+              <td>게이트 전압 변화에 대한 전류 증폭 민감도</td>
+            </tr>
+            <tr>
+              <td>출력 저항 (<i>r</i><sub>ds</sub>)</td>
+              <td><input type="text" id="rRds" placeholder="예: 1.85 kΩ" /></td>
+              <td>수백 &Omega; ~ 수 k&Omega;</td>
+              <td>포화 영역에서 전류가 일정하게 버티는 저항</td>
+            </tr>
+            <tr>
+              <td>Subthreshold Swing (<i>SS</i>)</td>
+              <td><input type="text" id="rSS" placeholder="예: 86.0 mV/dec" /></td>
+              <td>이론 한계 &ge; 60 mV/dec</td>
+              <td>전류를 10배 키우는 데 필요한 게이트 전압</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 선택한 파트너가 전하는 최종 환영 카드 -->
+        <div class="welcome-card" id="finalWelcomeCard"></div>
+      </section>
+
     </div>
-  </div>
+  </main>
+
+  <!-- 하단 앞/뒤/페이지 번호 바 (표지에서는 숨김 처리) -->
+  <footer class="footer-nav" id="footerNav" style="display:none;">
+    <button class="nav-btn" id="btnPrev">◀ 이전 장</button>
+    <div class="page-badge" id="pageBadge">1장 (2 / 9)</div>
+    <button class="nav-btn" id="btnNext">다음 장 ▶</button>
+  </footer>
 
 <script>
-let port = null, reader = null, writer = null;
-let isConnected = false, keepReading = false, autoRequestGraph = false;
-let currentGraph = null;
-let tables = { 1: [], 2: [], 3: [] };
-let rawLog = "";
-const expectedCols = { 1: 9, 2: 9, 3: 5 };
+/* =========================================================
+   1. 파트너 캐릭터 2종 데이터 & 선택 시 코스 등장 로직
+   ========================================================= */
+let selectedChar = null;
+let typingTimer = null;
 
-const logEl = document.getElementById("log");
-const statusBadge = document.getElementById("statusBadge");
-const alertBanner = document.getElementById("alertBanner");
-const safeChecks = document.querySelectorAll(".chk-safe");
-
-function appendLog(msg) {
-  rawLog += msg + "\n";
-  logEl.textContent += msg + "\n";
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-function showAlert(msg) {
-  alertBanner.textContent = msg;
-  alertBanner.style.display = "block";
-}
-
-function clearAlert() {
-  alertBanner.style.display = "none";
-}
-
-function isSafetyChecked() {
-  return Array.from(safeChecks).every(chk => chk.checked);
-}
-
-function updateButtons() {
-  document.getElementById("btnConn").disabled = isConnected;
-  document.getElementById("btnDisc").disabled = !isConnected;
-  document.getElementById("btnGraph").disabled = !isConnected;
-  document.getElementById("btnStop").disabled = !isConnected;
-  // 연결됨 + 안전 체크리스트 3개 모두 체크 시에만 측정 버튼 활성화
-  document.getElementById("btnRun").disabled = !(isConnected && isSafetyChecked());
-
-  statusBadge.textContent = isConnected ? "ESP32-S3 연결됨 (115200 bps)" : "미연결 (115200 bps)";
-  statusBadge.className = isConnected ? "status-pill on" : "status-pill";
-}
-
-safeChecks.forEach(chk => chk.addEventListener("change", updateButtons));
-
-async function sendCommand(cmd) {
-  if (!writer) return;
-  await writer.write(new TextEncoder().encode(cmd));
-  appendLog("[명령 전송] " + cmd.trim());
-}
-
-document.getElementById("btnConn").onclick = async () => {
-  if (!("serial" in navigator)) {
-    alert("Web Serial API를 지원하는 Chrome 또는 Edge 브라우저를 사용해주세요.");
-    return;
-  }
-  try {
-    port = await navigator.serial.requestPort();
-    await port.open({ baudRate: 115200 });
-    // 자동 리셋 및 의도치 않은 출력 방지를 위해 DTR/RTS 비활성화
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    writer = port.writable.getWriter();
-    isConnected = true;
-    keepReading = true;
-    clearAlert();
-    updateButtons();
-    appendLog("[연결 완료] 보드 통신 준비됨 (115200 bps)");
-    readLoop();
-  } catch (err) {
-    appendLog("[연결 실패] " + err.message);
+const CHAR_DATA = {
+  mos: {
+    name: '다정한 설명 파트너 · 모스 (MOS)',
+    animClass: 'anim-mos',
+    themeClass: '',
+    previewHtml: `<strong style="color:#2563eb;">[모스의 한마디]</strong> "안녕! 난 다정한 설명 파트너 모스야. 어려운 전공 용어도 수도꼭지나 다리 비유로 알기 쉽게 풀어줄게. 이제 아래에서 원하는 코스를 골라봐!"`,
+    svg: `<svg class="mascot-avatar anim-mos" viewBox="0 0 120 120">
+      <rect x="26" y="20" width="68" height="54" rx="14" fill="#1e293b" />
+      <rect x="34" y="28" width="52" height="36" rx="8" fill="#38bdf8" />
+      <circle cx="49" cy="45" r="4.5" fill="#0f172a" />
+      <circle cx="71" cy="45" r="4.5" fill="#0f172a" />
+      <path d="M51 54 Q60 62 69 54" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round" />
+      <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+      <rect x="57" y="74" width="6" height="34" rx="3" fill="#f59e0b" />
+      <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+    </svg>`,
+    speeches: {
+      1: "자, 나랑 같이 공부해 보자! 난 '전기로 여닫는 수도꼭지'야. 가운데 다리(Gate)에 전압을 살짝 걸어주면 양쪽 다리(Source와 Drain) 사이에 전자가 건너갈 다리가 생겨!",
+      2: "교과서 수식대로라면 수압(VDS)이 일정 기준을 넘는 순간 물줄기 굵기가 고정되면서 그래프가 완벽한 수평선이 되어야 해! 과연 실제 측정에서도 이렇게 나올까?",
+      3: "잠깐 워밍업 퀴즈 시간이야! 방금 본 내용만 떠올리면 금방 풀 수 있어. 틀려도 내가 바로 해설해 줄게, 편하게 골라봐!",
+      4: "자, 이제 직접 눈으로 확인해 볼 시간이야! 회색 점선이 교과서 이론선인데, 아래 측정 버튼을 눌러서 실제 소자 그래프를 겹쳐보자!",
+      5: "정답 공개! 보드가 고장 난 게 아니야. 포화 구간이 위로 살짝 올라간 건 '채널 길이 변조'라는 실제 반도체 물리 현상 때문이야!",
+      6: "방금 알아낸 원리를 잘 기억하고 있는지 확인해 볼까? 2문제만 가볍게 맞혀보자!",
+      7: "이제 마지막 실험이야! 게이트 전압을 바꿔가며 전류를 재면, 우리 소자의 문턱전압(VTN)과 증폭 능력(gm)을 자동으로 계산해 줄게!"
+    },
+    quizPraise: "우와, 한 번에 맞혔어! 역시 감각이 남다른데? ",
+    quizRetry: "아쉽지만 괜찮아! 아래 해설을 한번 읽어보자. ",
+    finalHtml: `
+      <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <svg class="anim-mos" width="72" height="72" viewBox="0 0 120 120" style="flex-shrink:0;">
+          <rect x="26" y="20" width="68" height="54" rx="14" fill="#334155" />
+          <rect x="34" y="28" width="52" height="36" rx="8" fill="#38bdf8" />
+          <circle cx="49" cy="45" r="4.5" fill="#0f172a" />
+          <circle cx="71" cy="45" r="4.5" fill="#0f172a" />
+          <path d="M50 53 Q60 63 70 53" stroke="#0f172a" stroke-width="3.5" fill="none" stroke-linecap="round" />
+          <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+          <rect x="57" y="74" width="6" height="34" rx="3" fill="#fbbf24" />
+          <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+        </svg>
+        <div style="flex:1; min-width:240px;">
+          <h3>🎓 끝까지 함께해 줘서 정말 고마워! 전자전기공학부에 온 걸 진심으로 환영해!</h3>
+          <p>오늘 직접 전압을 걸어보고 그래프를 뽑아보면서 반도체의 핵심인 MOSFET 원리를 차근차근 경험했어. 교과서 속 수식이 실제 회로에서 살아 움직이는 즐거움을 느꼈길 바라!</p>
+          <p style="color:#93c5fd; font-weight:700; margin-top:8px;">앞으로 전자전기공학부에서 펼쳐질 너의 멋진 전공 생활과 새로운 도전을 진심으로 응원할게! ⚡</p>
+        </div>
+      </div>`
+  },
+  volt: {
+    name: '실전파 공대 선배 · 볼트 (VOLT)',
+    animClass: 'anim-volt',
+    themeClass: 'volt-theme',
+    previewHtml: `<strong style="color:#0d9488;">[볼트의 한마디]</strong> "반갑다, 실전파 파트너 볼트야. 초보자도 한 번에 이해되게 핵심만 딱딱 짚어줄 테니까 믿고 따라와. 아래에서 시작할 코스를 선택해!"`,
+    svg: `<svg class="mascot-avatar anim-volt" viewBox="0 0 120 120">
+      <rect x="26" y="20" width="68" height="54" rx="12" fill="#0f172a" />
+      <rect x="34" y="28" width="52" height="36" rx="7" fill="#10b981" />
+      <rect x="38" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+      <rect x="63" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+      <line x1="57" y1="43" x2="63" y2="43" stroke="#ecfdf5" stroke-width="2" />
+      <path d="M52 56 L68 56" stroke="#064e3b" stroke-width="3" stroke-linecap="round" />
+      <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+      <rect x="57" y="74" width="6" height="34" rx="3" fill="#fbbf24" />
+      <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+    </svg>`,
+    speeches: {
+      1: "좋아, 나랑 같이 제대로 파헤쳐 보자! 거창하게 생각할 거 없어. Gate 전압으로 전자가 건너갈 통로를 열고 닫는 스위치 원리부터 눈으로 직접 확인해 봐.",
+      2: "이론 수식만 놓고 보면 VDS가 VGS - VTN 을 넘는 순간 전류가 딱 멈춰서 완벽한 수평선이 그려져야 정상이야. 과연 실제 부품도 교과서대로 움직일까?",
+      3: "실습실 들어가기 전에 기본 개념 3가지만 짚고 넘어가자. 핵심만 정확히 기억하고 있다면 10초 컷일 거야.",
+      4: "자, 이제 이론선(점선) 위에 실제 측정 파형을 겹쳐볼 차례야. 측정 버튼을 눌러서 교과서 예측이랑 실제 데이터가 얼마나 다른지 직접 확인해 봐!",
+      5: "봤지? 실제 소자는 수평이 아니라 완만하게 올라가. 고장이 아니라 '채널 길이 변조' 때문이야. 현업에서도 중요하게 보는 4가지 비이상적 특성을 정리해 뒀어.",
+      6: "방금 짚어준 물리적 원인들, 제대로 이해했는지 2문제로 바로 점검해 보자.",
+      7: "마지막 계측 단계야. VGS를 스윕해서 얻은 데이터로 문턱전압 VTN, 전도 계수 Kn, 그리고 스위칭 민감도 SS까지 한 번에 추출해 보자."
+    },
+    quizPraise: "오, 정확해. 원리를 제대로 짚었는데? ",
+    quizRetry: "방향이 살짝 빗나갔어. 아래 핵심 정리를 확인해 봐. ",
+    finalHtml: `
+      <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <svg class="anim-volt" width="72" height="72" viewBox="0 0 120 120" style="flex-shrink:0;">
+          <rect x="26" y="20" width="68" height="54" rx="12" fill="#0f172a" />
+          <rect x="34" y="28" width="52" height="36" rx="7" fill="#10b981" />
+          <rect x="38" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+          <rect x="63" y="37" width="19" height="13" rx="3" fill="#064e3b" stroke="#ecfdf5" stroke-width="2" />
+          <line x1="57" y1="43" x2="63" y2="43" stroke="#ecfdf5" stroke-width="2" />
+          <path d="M51 55 Q60 61 69 55" stroke="#064e3b" stroke-width="3" fill="none" stroke-linecap="round" />
+          <rect x="39" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+          <rect x="57" y="74" width="6" height="34" rx="3" fill="#fbbf24" />
+          <rect x="75" y="74" width="6" height="30" rx="3" fill="#94a3b8" />
+        </svg>
+        <div style="flex:1; min-width:240px;">
+          <h3>🎓 첫 실습부터 파라미터 추출까지 깔끔하게 해냈네. 전자전기공학부에 온 걸 환영한다!</h3>
+          <p>이론 수식과 실제 계측 파형의 차이를 직접 눈으로 확인하고 원인까지 분석해 낸 건 정말 큰 경험이야. 오늘 익힌 감각이면 앞으로 어떤 전공 실험도 거뜬할 거야.</p>
+          <p style="color:#6ee7b7; font-weight:700; margin-top:8px;">전자전기공학부에서의 새로운 시작을 진심으로 환영하고 응원할게! ⚡</p>
+        </div>
+      </div>`
   }
 };
 
-document.getElementById("btnDisc").onclick = async () => {
-  keepReading = false;
-  try {
-    if (reader) { await reader.cancel(); reader.releaseLock(); reader = null; }
-    if (writer) { writer.releaseLock(); writer = null; }
-    if (port) { await port.close(); port = null; }
-  } catch (e) {}
-  isConnected = false;
-  updateButtons();
-  appendLog("[연결 해제] 시리얼 포트를 닫았습니다.");
-};
+function selectPartner(charKey) {
+  selectedChar = charKey;
+  const cardMos = document.getElementById('cardMos');
+  const cardVolt = document.getElementById('cardVolt');
+  const badgeMos = document.getElementById('badgeMos');
+  const badgeVolt = document.getElementById('badgeVolt');
+  const svgMos = document.getElementById('coverSvgMos');
+  const svgVolt = document.getElementById('coverSvgVolt');
+  const afterArea = document.getElementById('afterCharArea');
 
-document.getElementById("btnRun").onclick = async () => {
-  if (!isSafetyChecked()) {
-    alert("상단 하드웨어 보호 체크리스트 3가지를 모두 확인해주세요.");
-    return;
-  }
-  const vgs = parseFloat(document.getElementById("vgsInput").value);
-  // 부품 보호를 위한 전압 범위 엄격 제한 (0.0V ~ 3.0V)
-  if (isNaN(vgs) || vgs < 0.0 || vgs > 3.0) {
-    alert("소자 및 DAC 보호를 위해 VGS는 0.0V ~ 3.0V 사이만 입력 가능합니다.");
-    return;
-  }
-  clearAlert();
-  tables = { 1: [], 2: [], 3: [] };
-  currentGraph = null;
-  autoRequestGraph = true;
-  await sendCommand(`v${vgs}\n`);
-};
+  cardMos.className = 'char-card' + (charKey === 'mos' ? ' selected-mos' : '');
+  cardVolt.className = 'char-card' + (charKey === 'volt' ? ' selected-volt' : '');
+  badgeMos.textContent = charKey === 'mos' ? '선택됨 ✓' : '클릭해서 변경';
+  badgeVolt.textContent = charKey === 'volt' ? '선택됨 ✓' : '클릭해서 변경';
 
-document.getElementById("btnGraph").onclick = async () => {
-  clearAlert();
-  tables = { 1: [], 2: [], 3: [] };
-  currentGraph = null;
-  await sendCommand("g\n");
-};
+  svgMos.classList.remove('anim-mos');
+  svgVolt.classList.remove('anim-volt');
+  void svgMos.offsetWidth;
+  if (charKey === 'mos') svgMos.classList.add('anim-mos');
+  else svgVolt.classList.add('anim-volt');
 
-document.getElementById("btnStop").onclick = async () => {
-  autoRequestGraph = false;
-  await sendCommand("x\n");
-  showAlert("사용자 요청으로 긴급 중단 명령(x)을 전송하여 출력을 차단했습니다.");
-};
+  document.getElementById('coverGuideText').textContent = '파트너 선택 완료! 이제 아래에서 원하는 학습 코스를 골라 시작하세요.';
+  document.getElementById('charPreviewBox').innerHTML = CHAR_DATA[charKey].previewHtml;
+  document.getElementById('finalWelcomeCard').innerHTML = CHAR_DATA[charKey].finalHtml;
 
-async function readLoop() {
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (port && port.readable && keepReading) {
-    reader = port.readable.getReader();
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop();
-        for (const l of lines) {
-          const line = l.trim();
-          if (line) handleLine(line);
-        }
-      }
-    } catch (err) {
-      if (keepReading) appendLog("[수신 오류] " + err.message);
-    } finally {
-      reader.releaseLock();
-    }
-  }
+  // 캐릭터를 고르면 그제서야 초보자용/이론 아는 사람용 선택칸이 나타남
+  afterArea.classList.remove('visible');
+  void afterArea.offsetWidth;
+  afterArea.classList.add('visible');
 }
 
-function handleLine(line) {
-  appendLog(line);
-
-  // 보드 자체 보호 로직 발동 감지
-  if (line.includes("[오류로 중단]") || line.includes("초과") || line.includes("위험")) {
-    showAlert("보호 동작 감지: " + line);
-  }
-
-  if (line.includes("[측정 완료]") || line.includes("[측정 종료]")) {
-    if (autoRequestGraph) {
-      autoRequestGraph = false;
-      setTimeout(() => sendCommand("g\n"), 1000);
-    }
-    return;
-  }
-
-  if (line.includes("[그래프 1]")) { currentGraph = 1; tables[1] = []; return; }
-  if (line.includes("[그래프 2]")) { currentGraph = 2; tables[2] = []; return; }
-  if (line.includes("[그래프 3]")) { currentGraph = 3; tables[3] = []; return; }
-
-  if (line.includes("그래프 데이터 추출 완료")) {
-    currentGraph = null;
-    appendLog("[완료] 6종 그래프 렌더링 완료");
-    renderAll();
-    return;
-  }
-
-  if (currentGraph !== null) {
-    if (line.startsWith("[") || line.startsWith("=") || !line.includes(",")) return;
-    const row = line.split(",").map(s => s.trim());
-    if (row.length === expectedCols[currentGraph]) {
-      tables[currentGraph].push(row);
-    }
-  }
+function startCourse(targetPageIdx) {
+  if (!selectedChar) selectedChar = 'mos';
+  goPage(targetPageIdx, true);
 }
 
-function getXY(rows, xi, yi) {
-  const pts = [];
-  for (let i = 1; i < rows.length; i++) {
-    const x = parseFloat(rows[i][xi]);
-    const y = parseFloat(rows[i][yi]);
-    if (!isNaN(x) && !isNaN(y)) pts.push({ x, y });
-  }
-  return pts;
-}
+function renderPageMascot(pageIdx, useTypewriter = false) {
+  const activeChar = selectedChar || 'mos';
+  const pageEl = pages[pageIdx];
+  if (!pageEl) return;
+  const bar = pageEl.querySelector('.mascot-bar');
+  if (!bar) return;
 
-function plot(canvasId, seriesList, refLines = []) {
-  const canvas = document.getElementById(canvasId);
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
+  const ch = CHAR_DATA[activeChar];
+  const fullText = ch.speeches[pageIdx] || '';
+  bar.className = 'mascot-bar ' + ch.themeClass;
+  bar.innerHTML = `
+    ${ch.svg}
+    <div class="mascot-speech">
+      <span class="mascot-name">${ch.name}</span>
+      <span class="speech-body"></span>
+    </div>
+  `;
 
-  const W = rect.width, H = rect.height;
-  const pad = { l: 48, r: 16, t: 22, b: 26 };
-  ctx.clearRect(0, 0, W, H);
+  const bodyEl = bar.querySelector('.speech-body');
+  if (typingTimer) { clearInterval(typingTimer); typingTimer = null; }
 
-  let allX = [], allY = [];
-  seriesList.forEach(s => s.pts.forEach(p => { allX.push(p.x); allY.push(p.y); }));
-  refLines.forEach(y => allY.push(y));
-  if (allX.length === 0) return;
-
-  let minX = Math.min(...allX), maxX = Math.max(...allX);
-  let minY = Math.min(...allY), maxY = Math.max(...allY);
-  if (minX === maxX) { minX -= 1; maxX += 1; }
-  if (minY === maxY) { minY -= 1; maxY += 1; }
-
-  const toX = x => pad.l + ((x - minX) / (maxX - minX)) * (W - pad.l - pad.r);
-  const toY = y => H - pad.b - ((y - minY) / (maxY - minY)) * (H - pad.t - pad.b);
-
-  // 격자 및 축
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(pad.l, pad.t);
-  ctx.lineTo(pad.l, H - pad.b);
-  ctx.lineTo(W - pad.r, H - pad.b);
-  ctx.stroke();
-
-  // 기준선 (점선)
-  refLines.forEach(val => {
-    const py = toY(val);
-    ctx.save();
-    ctx.strokeStyle = "#94a3b8";
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pad.l, py);
-    ctx.lineTo(W - pad.r, py);
-    ctx.stroke();
-    ctx.restore();
-  });
-
-  ctx.fillStyle = "#64748b";
-  ctx.font = "11px sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(maxY.toFixed(2), pad.l - 6, pad.t + 8);
-  ctx.fillText(minY.toFixed(2), pad.l - 6, H - pad.b);
-  ctx.textAlign = "center";
-  ctx.fillText(minX.toFixed(2), pad.l, H - 8);
-  ctx.fillText(maxX.toFixed(2), W - pad.r, H - 8);
-
-  seriesList.forEach((s, idx) => {
-    if (!s.pts.length) return;
-    ctx.strokeStyle = s.color;
-    ctx.fillStyle = s.color;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    s.pts.forEach((p, i) => {
-      const px = toX(p.x), py = toY(p.y);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.stroke();
-
-    s.pts.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(toX(p.x), toY(p.y), 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.textAlign = "left";
-    ctx.fillText("● " + s.label, pad.l + 8 + idx * 95, pad.t - 6);
-  });
-}
-
-function renderAll() {
-  const targetVgs = parseFloat(document.getElementById("vgsInput").value) || 2.0;
-
-  if (tables[2].length > 1) {
-    const vgsVals = tables[2].slice(1).map(r => parseFloat(r[2])).filter(v => !isNaN(v));
-    const avgVgs = vgsVals.length ? (vgsVals.reduce((a, b) => a + b, 0) / vgsVals.length).toFixed(3) : targetVgs.toFixed(2);
-    document.getElementById("info1").textContent = `목표 ${targetVgs.toFixed(2)}V / 실측 평균 ${avgVgs}V`;
-    plot("c1", [{ label: "ID (mA)", color: "#2563eb", pts: getXY(tables[2], 0, 1) }]);
-    document.getElementById("dl2").disabled = false;
-  }
-
-  if (tables[1].length > 1) {
-    plot("c2", [
-      { label: "VB (베이스)", color: "#d97706", pts: getXY(tables[1], 0, 3) },
-      { label: "VE (이미터)", color: "#059669", pts: getXY(tables[1], 0, 4) }
-    ]);
-    plot("c3", [
-      { label: "원본 (%)", color: "#64748b", pts: getXY(tables[1], 0, 5) },
-      { label: "필터 (%)", color: "#7c3aed", pts: getXY(tables[1], 0, 6) }
-    ], [95, 105]);
-    plot("c4", [
-      { label: "실제 VDS", color: "#2563eb", pts: getXY(tables[1], 0, 1) },
-      { label: "보정 VDS", color: "#16a34a", pts: getXY(tables[1], 0, 2) }
-    ]);
-    document.getElementById("dl1").disabled = false;
-  }
-
-  if (tables[3].length > 1) {
-    plot("c5", [
-      { label: "실측 VDS", color: "#2563eb", pts: getXY(tables[3], 0, 1) },
-      { label: "회귀 예측", color: "#dc2626", pts: getXY(tables[3], 0, 2) }
-    ]);
-    plot("c6", [
-      { label: "잔차 (V)", color: "#ca8a04", pts: getXY(tables[3], 0, 3) }
-    ], [0.05, 0, -0.05]);
-    document.getElementById("dl3").disabled = false;
-  }
-}
-
-function downloadCSV(filename, text) {
-  const blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8;" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-}
-
-document.getElementById("dlLog").onclick = () => downloadCSV("전체_시리얼_로그.txt", rawLog);
-document.getElementById("dl1").onclick = () => downloadCSV("1_예비측정.csv", tables[1].map(r => r.join(",")).join("\n"));
-document.getElementById("dl2").onclick = () => downloadCSV("2_본측정_IV.csv", tables[2].map(r => r.join(",")).join("\n"));
-document.getElementById("dl3").onclick = () => downloadCSV("3_선형회귀.csv", tables[3].map(r => r.join(",")).join("\n"));
-window.addEventListener("resize", renderAll);
-</script>
-</body>
-</html>
+  if (useTypewriter) {
+    let i = 0;
+    bodyEl.textContent = '';
+    typingTimer =
